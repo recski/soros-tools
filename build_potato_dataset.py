@@ -22,6 +22,9 @@ def get_graph_from_ana(sen):
         G[head_id][tok_id].update(
             {'color': deprel})
 
+    if root_id is None:
+        G.nodes[0]['name'] = 'root'
+
     return G, root_id
 
 
@@ -39,6 +42,13 @@ def gen_graphs_from_json(stream):
                     continue
                 sgraph, _ = get_graph_from_ana(ana_sen)
                 graph = nx.compose(graph, sgraph)
+
+            for node, data in graph.nodes(data=True):
+                if 'name' not in data:
+                    print(graph.nodes(data=True))
+                    print(sen['ana'][0])
+                    sys.exit(-1)
+
             yield text, graph
 
 
