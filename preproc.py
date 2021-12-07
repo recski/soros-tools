@@ -80,6 +80,7 @@ def parse_emtsv_toks(raw_output):
             sens.append({'toks': [], 'text': ''})
             continue
         tok, wsafter = line.split('\t')
+        wsafter = eval(wsafter)
         sens[-1]['toks'].append(tok)
         sens[-1]['text'] += tok + wsafter
 
