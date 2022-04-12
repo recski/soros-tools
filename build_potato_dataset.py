@@ -2,37 +2,53 @@ import json
 import sys
 
 import networkx as nx
+from tqdm import tqdm
 from xpotato.dataset.dataset import Dataset
 
 
 def get_graph_from_ana(sen):
     G = nx.DiGraph()
-    root_id = 0
+    root_id = None
     for tok in sen['toks']:
         tok_id = int(tok['id'])
         head_id = int(tok['head'])
+        deprel = tok["deprel"].lower()
         G.add_node(tok_id, name=tok["lemma"])
 
-        if tok["deprel"] == "root":
+        if deprel == "root":
             root_id = tok_id
             G.add_node(head_id, name="root")
         G.add_edge(head_id, tok_id)
         G[head_id][tok_id].update(
-            {'color': tok["deprel"]})
+            {'color': deprel})
+
+    if root_id is None:
+        G.nodes[0]['name'] = 'root'
 
     return G, root_id
 
 
 def gen_graphs_from_json(stream):
-    for line in stream:
+    for line in tqdm(stream):
         doc = json.loads(line)
         # doc_id = doc['doc_id']
+        if 'soros_sens' not in doc['content']:
+            continue
         for sen in doc['content']['soros_sens']:
             text = sen['text']
             graph, _ = get_graph_from_ana(sen['ana'][0])
             for ana_sen in sen['ana'][1:]:
+                if not ana_sen['toks']:
+                    continue
                 sgraph, _ = get_graph_from_ana(ana_sen)
                 graph = nx.compose(graph, sgraph)
+
+            for node, data in graph.nodes(data=True):
+                if 'name' not in data:
+                    print(graph.nodes(data=True))
+                    print(sen['ana'][0])
+                    sys.exit(-1)
+
             yield text, graph
 
 
