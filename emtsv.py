@@ -1,5 +1,11 @@
+import argparse
 import requests
 import sys
+
+from stanza.models.common.doc import Document
+from stanza.utils.conll import CoNLL
+
+from tuw_nlp.common.utils import print_conll, print_tikz_dep
 
 # EMTSV_URL = 'http://127.0.0.1:5000/tok/spell/morph/pos/conv-morph/dep/chunk/ner'  # noqa
 EMTSV_URL = "http://127.0.0.1:5000/udpipe-tok-parse"  # noqa
@@ -67,11 +73,23 @@ def run_emtsv_raw(text):
 def reformat_raw(raw_text):
     text = "\n".join(raw_text.strip().split("\n")[1:])  # remove header
     out = ""
-    for sen in text.split('\n\n'):
-        for c, tok in enumerate(sen.split('\n')):
-            out += f"{c+1}\t" + tok + "\n"
-        out += '\n'
-    return out
+    for sen in text.split("\n\n"):
+        for c, tok in enumerate(sen.split("\n")):
+            fields = tok.split('\t')
+            fields = [f"{c+1}"] + fields[:3] + ['_'] + fields[3:] + ['_']
+            out += "\t".join(fields) + "\n"
+        out += "\n"
+    return out.strip()
+
+
+def emtsv_to_stanza(raw_text):
+    text = reformat_raw(raw_text)
+    list_of_lists_of_toks = [
+        [tok.split("\t") for tok in sen.split("\n")] for sen in text.split("\n\n")
+    ]
+    dicts = CoNLL.convert_conll(list_of_lists_of_toks)
+    doc = Document(dicts)
+    return doc
 
 
 def run_emtsv_all(text):
@@ -102,10 +120,25 @@ def run_emtsv_tok(text):
     return sens
 
 
+def get_args():
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument("-o", "--out-file", type=str, default=None)
+    parser.add_argument("-t", "--tikz-dep", default=False, action="store_true")
+    return parser.parse_args()
+
+
 def main():
+    args = get_args()
+    out = sys.stdout if args.out_file is None else open(args.out_file, "w")
     for line in sys.stdin:
         output = run_emtsv_raw(line.strip())
-        print(reformat_raw(output))
+        doc = emtsv_to_stanza(output)
+        for sen in doc.sentences:
+            if args.tikz_dep:
+                print_tikz_dep(sen, out)
+            else:
+                print_conll(sen, out)
+                out.write('\n\n')
 
 
 if __name__ == "__main__":
